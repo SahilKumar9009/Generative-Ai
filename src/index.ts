@@ -40,6 +40,7 @@ function extractJson(text: string) {
   const cleaned = text.replace(/```json|```/g, "").trim();
   return JSON.parse(cleaned);
 }
+
 app.post("/api/quiz", async (req: Request, res: Response) => {
   const { topic } = req.body;
   try {
