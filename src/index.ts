@@ -147,6 +147,23 @@ app.post("/api/personalAssistant", async (req: Request, res: Response) => {
   }
 });
 
+//meme generator
+
+app.post("/api/meme", async (req: Request, res: Response) => {
+  const { prompt } = req.body;
+  try {
+    const aiResponse = await ai.models.generateImages({
+      model: "gemini-2.0-flash-001",
+      prompt: `Generate a meme based on the following prompt: ${prompt}`,
+    });
+    res.status(200).json({
+      data: aiResponse,
+    });
+  } catch (error) {
+    console.log("in the error", error);
+  }
+});
+
 app.listen(3000, () => {
   console.log("Server is running on port 3000");
 });
