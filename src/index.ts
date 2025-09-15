@@ -1,7 +1,6 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 import { GoogleGenAI } from "@google/genai";
-import { Request, Response } from "express";
 
 dotenv.config();
 
@@ -10,6 +9,23 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 app.use(express.json());
 
+/**
+ * Helpers
+ */
+function getText(response: any): string {
+  return response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
+function cleanJsonString(rawText: string): string {
+  return rawText
+    .replace(/```json/gi, "")
+    .replace(/```/g, "")
+    .trim();
+}
+
+/**
+ * Flashcard Generator
+ */
 app.post("/api/flashCard", async (req: Request, res: Response) => {
   const { notes } = req.body;
   try {
@@ -28,19 +44,51 @@ app.post("/api/flashCard", async (req: Request, res: Response) => {
         },
       ],
     });
-    res.json(JSON.parse(response.text!));
+
+    const raw = getText(response);
+    const flashcards = JSON.parse(cleanJsonString(raw));
+
+    res.json(flashcards);
   } catch (error) {
-    console.log(error);
+    console.error("Flashcard error:", error);
+    res.status(500).json({ error: "Failed to generate flashcards" });
   }
 });
 
-//Genearte Quiz
+/**
+ * Chat context
+ */
+let conversation = [
+  { role: "system", content: "You are a helpful assistant." },
+];
 
-function extractJson(text: string) {
-  const cleaned = text.replace(/```json|```/g, "").trim();
-  return JSON.parse(cleaned);
+async function chatInput(userInput: string) {
+  conversation.push({ role: "user", content: userInput });
+
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash-001",
+    contents: conversation,
+  });
+
+  console.log("in the rewponse from the gemini", response);
+  return getText(response);
 }
 
+app.post("/api/context", async (req: Request, res: Response) => {
+  const { prompt } = req.body;
+  try {
+    const responseFromAi = await chatInput(prompt);
+    console.log("in the response from ai", responseFromAi);
+    res.json({ response: responseFromAi });
+  } catch (error) {
+    console.error("Context error:", error);
+    res.status(500).json({ error: "Failed to process context" });
+  }
+});
+
+/**
+ * Quiz Generator
+ */
 app.post("/api/quiz", async (req: Request, res: Response) => {
   const { topic } = req.body;
   try {
@@ -53,36 +101,29 @@ app.post("/api/quiz", async (req: Request, res: Response) => {
             {
               text: `Generate 5 multiple choice questions about ${topic}
               Each question should have 4 options and one correct answer.
-              i want the response in the json format.
+              Format strictly as JSON:
               [
-                {"question": "...", "options": ["A", "B", "C", "D"], "answer": "A"},
-              ]
-              `,
+                {"question": "...", "options": ["A", "B", "C", "D"], "answer": "A"}
+              ]`,
             },
           ],
         },
       ],
     });
 
-    function cleanJsonString(rawText: string): string {
-      return rawText
-        .replace(/```json/gi, "") // remove ```json
-        .replace(/```/g, "") // remove ```
-        .trim();
-    }
-    console.log("in the response of the api ", cleanJsonString(response.text!));
-    const quiz = cleanJsonString(response.text!);
+    const quiz = cleanJsonString(getText(response));
     const quizArray = JSON.parse(quiz);
-    res.status(200).json({
-      data: quizArray,
-    });
+
+    res.status(200).json({ data: quizArray });
   } catch (error) {
-    console.log("in the error", error);
+    console.error("Quiz error:", error);
+    res.status(500).json({ error: "Failed to generate quiz" });
   }
 });
 
-//personal assistant for trainner
-
+/**
+ * Personal Assistant
+ */
 app.post("/api/personalAssistant", async (req: Request, res: Response) => {
   const {
     age,
@@ -90,80 +131,76 @@ app.post("/api/personalAssistant", async (req: Request, res: Response) => {
     currentHealth,
     currentWeight,
     height,
-    weight,
     activityLevel,
     exerciseLevel,
     sleepLevel,
     dietPlan,
   } = req.body;
+
   try {
     const prompt = `
       You are a personal trainer.
       The user is ${age} years old, with a goal to ${goal}.
       Current health: ${currentHealth}, weight: ${currentWeight} lbs, height: ${height} inches.
-      Activity level: ${activityLevel}, exercise level: ${exerciseLevel}, sleep level: ${sleepLevel}
-      dietPlan will be vegetarian, vegan, or omnivore.
-      The user has the following diet plan: ${dietPlan}
+      Activity level: ${activityLevel}, exercise level: ${exerciseLevel}, sleep level: ${sleepLevel}.
+      Diet plan: ${dietPlan}.
       
       Respond ONLY with a JSON object with these keys:
       1. workoutPlan: a list of workouts (array of objects with keys: name, sets, reps, rest)
       2. dietPlan: a list of foods with proper nutrition
       3. supplementPlan: a list of supplements
-
-      Do NOT include any text outside the JSON object.
     `;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash-001",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
 
+    const aiResponse = cleanJsonString(getText(response));
+    const aiResponseObject = JSON.parse(aiResponse);
+
+    res.status(200).json({ data: aiResponseObject });
+  } catch (error) {
+    console.error("PersonalAssistant error:", error);
+    res
+      .status(500)
+      .json({ error: "Failed to generate personal assistant plan" });
+  }
+});
+
+/**
+ * Meme Generator (returns base64 image)
+ */
+app.post("/api/meme", async (req: Request, res: Response) => {
+  const { prompt } = req.body;
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.0-pro-vision", // image-capable model
       contents: [
         {
           role: "user",
-          parts: [
-            {
-              text: prompt,
-            },
-          ],
+          parts: [{ text: `Generate a meme based on: ${prompt}` }],
         },
       ],
     });
 
-    function cleanJsonString(rawText: string): string {
-      return rawText
-        .replace(/```json/gi, "") // remove ```json
-        .replace(/```/g, "") // remove ```
-        .trim();
+    const imageBase64 =
+      response?.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+    if (!imageBase64) {
+      return res.status(400).json({ error: "No image generated" });
     }
-    console.log("in the response of the api ", cleanJsonString(response.text!));
-    const aiResponse = cleanJsonString(response.text!);
-    const aiResponseObject = JSON.parse(aiResponse);
 
-    res.status(200).json({
-      data: aiResponseObject,
-    });
-
-    console.log("in the response of the api in the get ai", response);
+    res.json({ image: imageBase64 });
   } catch (error) {
-    console.log("in the eroor", error);
+    console.error("Meme error:", error);
+    res.status(500).json({ error: "Failed to generate meme" });
   }
 });
 
-//meme generator
-
-app.post("/api/meme", async (req: Request, res: Response) => {
-  const { prompt } = req.body;
-  try {
-    const aiResponse = await ai.models.generateImages({
-      model: "gemini-2.0-flash-001",
-      prompt: `Generate a meme based on the following prompt: ${prompt}`,
-    });
-    res.status(200).json({
-      data: aiResponse,
-    });
-  } catch (error) {
-    console.log("in the error", error);
-  }
-});
-
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+/**
+ * Server
+ */
+app.listen(4001, () => {
+  console.log("✅ Server is running on port 4001");
 });

@@ -85,11 +85,12 @@ async function chatInput(userINput: string) {
 
 chatInput("hello");
 
-app.post("/api/context", (req) => {
+app.post("/api/context", async (req, res) => {
   const { prompt } = req.body;
+  const responseFromAi = await chatInput(prompt);
 
-  const responseFromAi = chatInput(prompt);
-  console.log("in the response from Ai", responseFromAi);
+  const text = responseFromAi?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+  res.json({ response: text });
 });
 
 app.post("/api/generate", (req, res) => {
@@ -113,6 +114,6 @@ app.post("/api/generate", (req, res) => {
     });
 });
 
-app.listen(3000, () => {
-  console.log("Server is running on port 3000");
+app.listen(6000, () => {
+  console.log("Server is running on port 6000");
 });
