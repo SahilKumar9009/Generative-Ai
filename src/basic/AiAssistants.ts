@@ -67,6 +67,31 @@ app.get("/", (req, res) => {
   res.send("Hello World");
 });
 
+let conversion = [{ role: "system", content: "You are a helpful assistant." }];
+
+async function chatInput(userINput: string) {
+  conversion.push({
+    role: "user",
+    content: userINput,
+  });
+
+  const response = ai.models.generateContent({
+    model: "gemini-2.0-flash-001",
+    contents: conversion,
+  });
+
+  return response;
+}
+
+chatInput("hello");
+
+app.post("/api/context", (req) => {
+  const { prompt } = req.body;
+
+  const responseFromAi = chatInput(prompt);
+  console.log("in the response from Ai", responseFromAi);
+});
+
 app.post("/api/generate", (req, res) => {
   const { prompt } = req.body;
   ai.models
