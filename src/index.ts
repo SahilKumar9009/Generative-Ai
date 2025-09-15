@@ -9,9 +9,6 @@ const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 app.use(express.json());
 
-/**
- * Helpers
- */
 function getText(response: any): string {
   return response?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 }
@@ -23,9 +20,6 @@ function cleanJsonString(rawText: string): string {
     .trim();
 }
 
-/**
- * Flashcard Generator
- */
 app.post("/api/flashCard", async (req: Request, res: Response) => {
   const { notes } = req.body;
   try {
@@ -55,9 +49,6 @@ app.post("/api/flashCard", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * Chat context
- */
 let conversation = [
   { role: "system", content: "You are a helpful assistant." },
 ];
@@ -86,9 +77,6 @@ app.post("/api/context", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * Quiz Generator
- */
 app.post("/api/quiz", async (req: Request, res: Response) => {
   const { topic } = req.body;
   try {
@@ -121,9 +109,6 @@ app.post("/api/quiz", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * Personal Assistant
- */
 app.post("/api/personalAssistant", async (req: Request, res: Response) => {
   const {
     age,
@@ -168,9 +153,6 @@ app.post("/api/personalAssistant", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * Meme Generator (returns base64 image)
- */
 app.post("/api/meme", async (req: Request, res: Response) => {
   const { prompt } = req.body;
   try {
@@ -198,9 +180,6 @@ app.post("/api/meme", async (req: Request, res: Response) => {
   }
 });
 
-/**
- * Server
- */
 app.listen(4001, () => {
   console.log("✅ Server is running on port 4001");
 });
